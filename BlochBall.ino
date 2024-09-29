@@ -1,5 +1,3 @@
-//www.elegoo.com
-//2016.12.09
 
 // Arduino pin numbers
 const int SW_pin = 2; // digital pin connected to switch output
@@ -20,11 +18,21 @@ const int Z_ONE_PIN = 12;
 
 // Values for Bases
 const String Z_ZERO = "Z_ZERO";
+const String Z_ZERO_KET = "|0>";
 const String Z_ONE = "Z_ONE";
+const String Z_ONE_KET = "|1>";
 const String X_PLUS = "X_PLUS";
+const String X_PLUS_KET = "|+>";
 const String X_MINUS = "X_MINUS";
+const String X_MINUS_KET = "|->";
 const String Y_PLUS = "Y_PLUS";
+const String Y_PLUS_KET = "|+i>";
 const String Y_MINUS = "Y_MINUS";
+const String Y_MINUS_KET = "|-i>";
+
+const char Z = 'Z';
+const char Y = 'Y';
+const char X = 'X';
 
 // Values for navigation and calc
 String initialState = "";
@@ -52,24 +60,37 @@ void setup() {
 
   pinMode(Y_PLUS_PIN, OUTPUT);
   pinMode(Y_MINUS_PIN, OUTPUT);
+
   Serial.begin(9600);
 
 
 }
-String getIntraBasisConversionGate(String currState) {
-  if (currState[0] == "Z") {
+
+String getKetRepresentation(String state) {
+  if (state.equals(Z_ZERO)){
+    return Z_ZERO_KET;
+  } else if (state.equals(Z_ONE)){
+    return Z_ONE_KET;
+  } else if (state.equals(X_PLUS)){
+    return X_PLUS_KET;
+  } else if (state.equals(X_MINUS)){
+    return X_MINUS_KET;
+  } else if (state.equals(Y_PLUS)){
+    return Y_PLUS_KET;
+  } else {
+    return Y_MINUS_KET;
+  }
+}
+
+String getIntraBasisConversionGate(String state) {
+  if (state[0] == "Z") {
     return "X";
   } else {
     return "Z";
   }
 }
 
-String performCalc() {
-  Serial.print("performing calc\n ");
-  Serial.print(initialState);
-  Serial.print(finalState);
-  Serial.print("\n");
-
+void performCalc() {
   char initialBasis = initialState[0];
   char finalBasis = finalState[0];
 
@@ -78,7 +99,9 @@ String performCalc() {
 
   // If initial state and final state aren't in the same basis, change initial state to being in the basis of final state
   if (initialBasis != finalBasis) {
-    if ((initialBasis == "Z" && finalBasis == "X") || (initialBasis == "X" && finalBasis == "Z")) {
+    // Serial.print("BASES DONT EQUAL");
+    if ((initialBasis == Z && finalBasis == X) || (initialBasis == X && finalBasis == Z)) {
+      // Serial.print("1");
       gatePattern = "H";
       if (initialState.equals(Z_ZERO)) {
         intermediateState = X_PLUS;
@@ -89,29 +112,33 @@ String performCalc() {
       } else {
         intermediateState = Z_ONE;
       }
-    } else if (initialBasis == "Z" && finalBasis == "Y") {
+    } else if (initialBasis == Z && finalBasis == Y) {
+      // Serial.print("2");
       gatePattern = "SH";
       if (initialState.equals(Z_ZERO)) {
         intermediateState = Y_PLUS;
       } else {
         intermediateState = Y_MINUS;
       }
-    } else if (initialBasis == "X" && finalBasis == "Y") {
+    } else if (initialBasis == X && finalBasis == Y) {
       gatePattern = "S";
+      // Serial.print("3");
       if (initialState.equals(X_PLUS)) {
         intermediateState = Y_PLUS;
       } else {
         intermediateState = Y_MINUS;
       }
-    } else if (initialBasis == "Y" && finalBasis == "Z") {
+    } else if (initialBasis == Y && finalBasis == Z) {
       gatePattern = "S†H";
+      // Serial.print("4");
       if (initialState.equals(Y_PLUS)) {
         intermediateState = Z_ZERO;
       } else {
         intermediateState = Z_ONE;
       }
-    } else if (initialBasis == "Y" && finalBasis == "X") {
+    } else if (initialBasis == Y && finalBasis == X) {
       gatePattern = "S†";
+      // Serial.print("5");
       if (initialState.equals(Y_PLUS)) {
         intermediateState = X_PLUS;
       } else {
@@ -121,14 +148,18 @@ String performCalc() {
   } 
 
   // If states still aren't the same, apply extra gate to flip state
-  if (!initialState.equals(finalState) || !intermediateState.equals(finalState)) {
-    if (finalBasis == "Z") {
+  if (!(initialState.equals(finalState) || intermediateState.equals(finalState))) {
+    if (finalBasis == Z) {
+      // Serial.print("6");
       gatePattern = "X" + gatePattern;
     } else {
+      // Serial.print("7");
       gatePattern = "Z" + gatePattern;
     }
   }
-  return gatePattern;
+  
+  Serial.print("\nCONVERSION\n");
+  Serial.print(getKetRepresentation(finalState) + " = " + gatePattern + getKetRepresentation(initialState));
 }
 
 void handleVerticalChange(bool up) {
@@ -139,8 +170,6 @@ void handleVerticalChange(bool up) {
   } else {
     up? currentPosition = Z_ONE: currentPosition = Z_ZERO;
   }
-  Serial.print(currentPosition);
-  Serial.print(" NEW POSITION\n");
 }
 
 void handleHorizontalChange(bool right) {
@@ -158,8 +187,6 @@ void handleHorizontalChange(bool right) {
   } else {
     right? currentPosition = Y_MINUS: currentPosition = Y_PLUS;
   }
-  Serial.print(currentPosition);
-  Serial.print(" NEW POSITION\n");
 }
 
 void setLight() {
@@ -175,14 +202,18 @@ void logInfo() {
   if (gameState == 0) {
     initialState = currentPosition;
     gameState++;
-    Serial.print(initialState);
-    Serial.print(" INITAL STATE DONE\n");
+    Serial.print("INITIAL STATE: ");
+    Serial.print(getKetRepresentation(initialState));
+    Serial.print("\n");
   } else if (gameState == 1) {
     finalState = currentPosition;
+    Serial.print("FINAL STATE: ");
+    Serial.print(getKetRepresentation(finalState));
+    Serial.print("\n");
+    performCalc();
     gameState++;
-    Serial.print("FINAL STATE DONE\n");
-    Serial.print(performCalc());
   } else {
+    Serial.print("\n\nRESTARTING SESSION\n\n");
     gameState = 0;
     currentPosition = Z_ZERO;
   }
